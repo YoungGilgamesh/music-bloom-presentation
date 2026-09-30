@@ -2,8 +2,10 @@ import * as THREE from 'three'
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
 import { FluidRibbonField } from './particles/FluidRibbonField.js'
 import { SoulAvatar } from './render/SoulAvatar.js'
+import { SoulTrail } from './render/SoulTrail.js'
 import { VoidBackdrop } from './render/VoidBackdrop.js'
 import { sampleWorldColor } from './render/worldPalette.js'
+import { WanderingSouls } from './world/WanderingSouls.js'
 import titleImageUrl from './assets/musicBloom_title.png'
 import nameImageUrl from './assets/name.png'
 import conceptImageUrl from './assets/concept.png'
@@ -45,6 +47,12 @@ controls.update()
 const soul = new SoulAvatar()
 const avatar = soul.object3D
 scene.add(avatar)
+
+const soulTrail = new SoulTrail()
+scene.add(soulTrail.object3D)
+
+const wanderingSouls = new WanderingSouls()
+scene.add(wanderingSouls.object3D)
 
 const titleTexture = new THREE.TextureLoader().load(titleImageUrl)
 titleTexture.colorSpace = THREE.SRGBColorSpace
@@ -202,17 +210,11 @@ const cameraRight = new THREE.Vector3()
 const worldColor = new THREE.Color()
 const lightColor = new THREE.Color()
 const moveSpeed = 5
-let titleTransitionTriggered = false
 let titleTransitionProgress = 0
-let nameTransitionTriggered = false
 let nameTransitionProgress = 0
-let conceptTransitionTriggered = false
 let conceptTransitionProgress = 0
-let descriptionTransitionTriggered = false
 let descriptionTransitionProgress = 0
-let inspirationTransitionTriggered = false
 let inspirationTransitionProgress = 0
-let toolTransitionTriggered = false
 let toolTransitionProgress = 0
 
 window.addEventListener('keydown', (event) => {
@@ -230,6 +232,7 @@ window.addEventListener('resize', () => {
   camera.updateProjectionMatrix()
   renderer.setSize(window.innerWidth, window.innerHeight)
   fluidRibbons.resize()
+  soulTrail.resize()
 })
 
 function animate() {
@@ -256,84 +259,42 @@ function animate() {
     controls.target.add(movement)
   }
 
-  const titleDistance = Math.hypot(
-    avatar.position.x - title.position.x,
-    avatar.position.z - title.position.z,
+  titleTransitionProgress = THREE.MathUtils.damp(
+    titleTransitionProgress,
+    Number(avatar.position.z <= title.position.z + 3),
+    1.8,
+    delta,
   )
-  if (titleDistance < 3) titleTransitionTriggered = true
-  if (titleTransitionTriggered) {
-    titleTransitionProgress = THREE.MathUtils.damp(
-      titleTransitionProgress,
-      1,
-      1.8,
-      delta,
-    )
-  }
-  const nameDistance = Math.hypot(
-    avatar.position.x - namePlane.position.x,
-    avatar.position.z - namePlane.position.z,
+  nameTransitionProgress = THREE.MathUtils.damp(
+    nameTransitionProgress,
+    Number(avatar.position.z <= namePlane.position.z + 3),
+    1.8,
+    delta,
   )
-  if (nameDistance < 3) nameTransitionTriggered = true
-  if (nameTransitionTriggered) {
-    nameTransitionProgress = THREE.MathUtils.damp(
-      nameTransitionProgress,
-      1,
-      1.8,
-      delta,
-    )
-  }
-  const conceptDistance = Math.hypot(
-    avatar.position.x - conceptPlane.position.x,
-    avatar.position.z - conceptPlane.position.z,
+  conceptTransitionProgress = THREE.MathUtils.damp(
+    conceptTransitionProgress,
+    Number(avatar.position.z <= conceptPlane.position.z + 3),
+    1.8,
+    delta,
   )
-  if (conceptDistance < 3) conceptTransitionTriggered = true
-  if (conceptTransitionTriggered) {
-    conceptTransitionProgress = THREE.MathUtils.damp(
-      conceptTransitionProgress,
-      1,
-      1.8,
-      delta,
-    )
-  }
-  const descriptionDistance = Math.hypot(
-    avatar.position.x - descriptionPlane.position.x,
-    avatar.position.z - descriptionPlane.position.z,
+  descriptionTransitionProgress = THREE.MathUtils.damp(
+    descriptionTransitionProgress,
+    Number(avatar.position.z <= descriptionPlane.position.z + 3),
+    1.8,
+    delta,
   )
-  if (descriptionDistance < 3) descriptionTransitionTriggered = true
-  if (descriptionTransitionTriggered) {
-    descriptionTransitionProgress = THREE.MathUtils.damp(
-      descriptionTransitionProgress,
-      1,
-      1.8,
-      delta,
-    )
-  }
-  const inspirationDistance = Math.hypot(
-    avatar.position.x - inspirationPlane.position.x,
-    avatar.position.z - inspirationPlane.position.z,
+  inspirationTransitionProgress = THREE.MathUtils.damp(
+    inspirationTransitionProgress,
+    Number(avatar.position.z <= inspirationPlane.position.z + 3),
+    1.8,
+    delta,
   )
-  if (inspirationDistance < 3) inspirationTransitionTriggered = true
-  if (inspirationTransitionTriggered) {
-    inspirationTransitionProgress = THREE.MathUtils.damp(
-      inspirationTransitionProgress,
-      1,
-      1.8,
-      delta,
-    )
-  }
-  const toolDistance = Math.hypot(
-    avatar.position.x - toolPlane.position.x,
-    avatar.position.z - toolPlane.position.z,
+  toolTransitionProgress = THREE.MathUtils.damp(
+    toolTransitionProgress,
+    Number(avatar.position.z <= toolPlane.position.z + 3),
+    1.8,
+    delta,
   )
-  if (toolDistance < 3) toolTransitionTriggered = true
-  if (toolTransitionTriggered) {
-    toolTransitionProgress = THREE.MathUtils.damp(
-      toolTransitionProgress,
-      1,
-      1.8,
-      delta,
-    )
-  }
   titleMaterial.opacity = 1 - THREE.MathUtils.smoothstep(titleTransitionProgress, 0, 0.45)
   const nameFadeIn = THREE.MathUtils.smoothstep(titleTransitionProgress, 0.55, 1)
   const nameFadeOut = THREE.MathUtils.smoothstep(nameTransitionProgress, 0, 0.45)
@@ -354,6 +315,8 @@ function animate() {
 
   sampleWorldColor(timer.getElapsed(), worldColor)
   soul.update(timer.getElapsed(), isWalking, worldColor)
+  soulTrail.update(timer.getElapsed(), isWalking, avatar.position, movement, worldColor)
+  wanderingSouls.update(timer.getElapsed(), delta, avatar.position, worldColor)
 
   ambientLight.color.copy(worldColor).lerp(lightColor.set('#ffffff'), 0.18)
   ambientLight.groundColor.copy(worldColor).multiplyScalar(0.045)

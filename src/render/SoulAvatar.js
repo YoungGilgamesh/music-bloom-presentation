@@ -65,6 +65,26 @@ const auraFragmentShader = /* glsl */ `
   }
 `
 
+const shadowVertexShader = /* glsl */ `
+  varying vec2 vUv;
+
+  void main() {
+    vUv = uv;
+    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+  }
+`
+
+const shadowFragmentShader = /* glsl */ `
+  varying vec2 vUv;
+
+  void main() {
+    vec2 offset = (vUv - 0.5) * 2.0;
+    float distanceFromCenter = length(offset);
+    float alpha = (1.0 - smoothstep(0.08, 1.0, distanceFromCenter)) * 0.28;
+    gl_FragColor = vec4(0.0, 0.0, 0.015, alpha);
+  }
+`
+
 function createSoulGeometry() {
   const profile = [
     new THREE.Vector2(0.025, 0.05),
@@ -112,6 +132,20 @@ export class SoulAvatar {
 
     const bodyGeometry = createSoulGeometry()
     const headGeometry = new THREE.SphereGeometry(0.31, 36, 24)
+    const shadowMaterial = new THREE.ShaderMaterial({
+      vertexShader: shadowVertexShader,
+      fragmentShader: shadowFragmentShader,
+      transparent: true,
+      depthWrite: false,
+      side: THREE.DoubleSide,
+    })
+    const shadow = new THREE.Mesh(
+      new THREE.PlaneGeometry(1.45, 0.82),
+      shadowMaterial,
+    )
+    shadow.rotation.x = -Math.PI / 2
+    shadow.position.y = 0.025
+    shadow.renderOrder = -1
     const coreMaterial = createMaterial(
       coreFragmentShader,
       this.uniforms,
@@ -130,6 +164,7 @@ export class SoulAvatar {
     headAura.position.copy(headCore.position)
     headAura.scale.setScalar(1.2)
 
+    this.object3D.add(shadow)
     this.visual.add(bodyAura, bodyCore, headAura, headCore)
     this.visual.position.y = 0.18
   }
